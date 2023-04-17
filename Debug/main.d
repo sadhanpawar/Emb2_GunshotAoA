@@ -15,6 +15,8 @@ main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/inclu
 main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
 main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/limits.h
+main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h
+main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h
 main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/inttypes.h
 main.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_inttypes.h
 main.obj: ../tm4c123gh6pm.h
@@ -28,6 +30,7 @@ main.obj: ../adc0.h
 main.obj: ../main.h
 main.obj: ../timer.h
 main.obj: ../eeprom.h
+main.obj: ../dma.h
 
 ../main.c:
 
@@ -59,6 +62,10 @@ main.obj: ../eeprom.h
 
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/limits.h:
 
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h:
+
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h:
+
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/inttypes.h:
 
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_inttypes.h:
@@ -84,4 +91,6 @@ main.obj: ../eeprom.h
 ../timer.h:
 
 ../eeprom.h:
+
+../dma.h:
 

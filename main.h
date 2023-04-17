@@ -8,9 +8,9 @@
 #define NO_OF_SAMPLES   (16u)
 
 #define EEP_TIME_CONSTANT       (10u)
-#define EEP_BACK_OFF            (11u)
-#define EEP_HOLD_OFF            (12u)
-#define EEP_HYSTERESIS          (13u)
+#define EEP_BACK_OFF            (12u)
+#define EEP_HOLD_OFF            (14u)
+#define EEP_HYSTERESIS          (16u)
 
 #define AVERAGE_FSM         (1)
 #define PEAKS_FSM           (2)
@@ -44,5 +44,7 @@ typedef struct
 }peekDetectOrder_t;
 
 void initApp(void);
+void calculateAvgs(void);
 
+/*60+k(t3-t2)*/
 #endif

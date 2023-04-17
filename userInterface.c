@@ -117,11 +117,11 @@ void processShell()
             if (strcmp(token, "tdoa") == 0)
             {
                 token = strtok(NULL, " ");
-                if (strcmp(token, "ON") == 0)
+                if (strcmp(token, "on") == 0)
                 {
                     tdoaEnable = true;
                 }
-                else if(strcmp(token, "OFF") == 0)
+                else if(strcmp(token, "off") == 0)
                 {
                     tdoaEnable = false;
                 }
@@ -129,11 +129,11 @@ void processShell()
             if (strcmp(token, "fail") == 0)
             {
                 token = strtok(NULL, " ");
-                if (strcmp(token, "ON") == 0)
+                if (strcmp(token, "on") == 0)
                 {
                     partialSets = true;
                 }
-                else if(strcmp(token, "OFF") == 0)
+                else if(strcmp(token, "off") == 0)
                 {
                     partialSets = false;
                 }
@@ -188,10 +188,6 @@ void setTimeConstant(uint16_t value)
 {
     timeConstant = value;
     writeEeprom(EEP_TIME_CONSTANT,value);
-
-
-    //stopTimer(adcTimeConstant);
-    //startPeriodicTimer(adcTimeConstant,timeConstant*1000); // converting to ms
 }
 
 void setBackOff(uint16_t value)
