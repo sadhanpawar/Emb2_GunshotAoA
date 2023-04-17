@@ -1,5 +1,5 @@
 
-#if 0
+#ifdef DMAENABLED
 #ifndef DMA_H_
 #define DMA_H_
 
@@ -7,6 +7,7 @@
 
 void initDma(void);
 void checkMyDmaTransfer(void);
+void DmaBusError(void);
 
 #endif
 #endif

@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 
+//#define DMAENABLED
 //*****************************************************************************
 //
 // Forward declaration of the default fault handlers.
@@ -42,7 +43,10 @@ static void IntDefaultHandler(void);
 //*****************************************************************************
 extern void _c_int00(void);
 extern void aoaAdc0InterruptHandler(void);
-
+#ifdef DMAENABLED
+extern void checkMyDmaTransfer(void);
+extern void DmaBusError(void);
+#endif
 //*****************************************************************************
 //
 // Linker variable that marks the top of the stack.
@@ -130,8 +134,13 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // Hibernate
     IntDefaultHandler,                      // USB0
     IntDefaultHandler,                      // PWM Generator 3
-    IntDefaultHandler,                      // uDMA Software Transfer
-    IntDefaultHandler,                      // uDMA Error
+    #ifdef DMAENABLED
+    checkMyDmaTransfer,                     // uDMA Software Transfer
+    DmaBusError,
+    #else 
+    IntDefaultHandler,
+    IntDefaultHandler,
+    #endif                                  // uDMA Error
     IntDefaultHandler,                      // ADC1 Sequence 0
     IntDefaultHandler,                      // ADC1 Sequence 1
     IntDefaultHandler,                      // ADC1 Sequence 2

@@ -24,6 +24,7 @@
 #include "dma.h"
 
 bool const iirFilterEnable = false;
+bool const dmaEnable = false;
 uint16_t mic1Samples[NO_OF_SAMPLES] = {0};
 uint16_t mic2Samples[NO_OF_SAMPLES] = {0};
 uint16_t mic3Samples[NO_OF_SAMPLES] = {0};
@@ -61,7 +62,10 @@ uint8_t threeSampleDetCount = 0;
 uint32_t peekTimeout = 0;
 
 #define DEBUG
+#define FIRFILTER 0
+#define IIRFILTER 1
 #define FILTER FIRFILTER
+//#define DMAENABLED
 
 void initHw()
 {
@@ -70,22 +74,25 @@ void initHw()
     enablePort(PORTF);
     selectPinPushPullOutput(PEAKS_DETECT_LED);
 
-    initAdc0();
     initUart0();
     setUart0BaudRate(115200, 40e6);
+
+    #ifdef DMAENABLED
+        initDma();
+    #endif
+
+    initAdc0();
     initEeprom();
 }
 
 void aoaAdc0InterruptHandler(void)
 {
-    uint32_t* p;
+    uint32_t* p = (uint32_t*)PORTF + 1;
 
     if((adcTicks%166666) == 0) {
-        //togglePinValue(PEAKS_DETECT_LED);
-        p = (uint32_t*)PORTF + 1;
         *p ^= 1;
     }
-    
+
     #if 1
         //if(iirFilterEnable == false) {
         
@@ -101,15 +108,15 @@ void aoaAdc0InterruptHandler(void)
 
         idx = (idx+1)%NO_OF_SAMPLES;
 
-        mic1Samples[idx] = ADC0_SSFIFO0_R;
-        mic2Samples[idx] = ADC0_SSFIFO0_R;
-        mic3Samples[idx] = ADC0_SSFIFO0_R;
-
-        mic1SamplesAvg +=   mic1Samples[idx];
-        mic2SamplesAvg +=   mic2Samples[idx];
-        mic3SamplesAvg +=   mic3Samples[idx];
-
-        idx = (idx+1)%NO_OF_SAMPLES;
+//        mic1Samples[idx] = ADC0_SSFIFO0_R;
+//        mic2Samples[idx] = ADC0_SSFIFO0_R;
+//        mic3Samples[idx] = ADC0_SSFIFO0_R;
+//
+//        mic1SamplesAvg +=   mic1Samples[idx];
+//        mic2SamplesAvg +=   mic2Samples[idx];
+//        mic3SamplesAvg +=   mic3Samples[idx];
+//
+//        idx = (idx+1)%NO_OF_SAMPLES;
 
         #elif FILTER == IIRFILTER
         //} else {
@@ -128,12 +135,18 @@ void aoaAdc0InterruptHandler(void)
         {
             if((adcTicks%(timeConstant*3)) == 0) {
                 mic3SamplesAvg /= NO_OF_SAMPLES;
+                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+                //backOff = (uint16_t)(0.50 * threshold);
             }
             else if((adcTicks%(timeConstant*2)) == 0) {
                 mic2SamplesAvg /= NO_OF_SAMPLES;
+                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+                //backOff = (uint16_t)(0.50 * threshold);
             }
             else if((adcTicks%(timeConstant*1)) == 0) {
                 mic1SamplesAvg /= NO_OF_SAMPLES;
+                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+                //backOff = (uint16_t)(0.50 * threshold);
             }     
         }
 
@@ -193,6 +206,10 @@ void aoaAdc0InterruptHandler(void)
 
         if(aoAFSM == PEAKS_FSM)
         {
+            mic1Samples[idx] = ADC0_SSFIFO0_R;
+            mic2Samples[idx] = ADC0_SSFIFO0_R;
+            mic3Samples[idx] = ADC0_SSFIFO0_R;
+
             //if((adcTicks - peekTimeout) >= 2*166666) //Timeout of 280 ~ 300us 
             if((adcTicks - peekTimeout) >= 8333) //0.5s
             {
@@ -209,7 +226,7 @@ void aoaAdc0InterruptHandler(void)
                 return ;
             }
 
-            rolledIdx = idx - 1;
+            rolledIdx = idx;
 
             if(rolledIdx < 0) {
                 rolledIdx = (NO_OF_SAMPLES - 1);
@@ -269,8 +286,35 @@ void aoaAdc0InterruptHandler(void)
                     ++threeSampleDetCount;
                 }
             }
+
+            mic1SamplesAvg +=   mic1Samples[idx];
+            mic2SamplesAvg +=   mic2Samples[idx];
+            mic3SamplesAvg +=   mic3Samples[idx];
+
+            idx = (idx+1)%NO_OF_SAMPLES;
+
+        }
+        else
+        {
+            mic1Samples[idx] = ADC0_SSFIFO0_R;
+            mic2Samples[idx] = ADC0_SSFIFO0_R;
+            mic3Samples[idx] = ADC0_SSFIFO0_R;
+
+            mic1SamplesAvg +=   mic1Samples[idx];
+            mic2SamplesAvg +=   mic2Samples[idx];
+            mic3SamplesAvg +=   mic3Samples[idx];
+
+        idx = (idx+1)%NO_OF_SAMPLES;
         }
     #endif
+
+    #ifdef DMAENABLED
+        if(UDMA_CHIS_R & (1<<14)) {
+            UART0_DR_R = 'D';
+            UDMA_CHIS_R = (1<<14);
+        }
+    #endif
+
     ++adcTicks;
     ADC0_ISC_R = 0x1;
 }
@@ -301,10 +345,9 @@ void audioProcess(void)
         case AVERAGE_FSM:
         {
             //setPinValue(PEAKS_DETECT_LED,0);
-            memset(peekDetectionOrder,0,sizeof(peekDetectionOrder));
+            //memset(peekDetectionOrder,0,sizeof(peekDetectionOrder));
             holdOffFlag = false;
             hysteresisFlag = false;
-            threeSampleDetCount = 0;
             wherePeek = 0;
             orderIdx = 0;
 
@@ -336,7 +379,7 @@ void audioProcess(void)
                 snprintf(str,sizeof(str),"peek detected at %"PRIu8"\n",wherePeek);
                 putsUart0(str);
 
-                #if 0
+                #if 1
                 putsUart0("***********************************************************\n");
                 snprintf(str,sizeof(str),"3 sample detect: %"PRIu8"\n",threeSampleDetCount);
                 putsUart0(str);
@@ -372,7 +415,7 @@ void audioProcess(void)
 void calculateAvgs(void)
 {
     threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-    backOff = (uint16_t)(0.75 * threshold);
+    //backOff = (uint16_t)(0.50 * threshold);
 }
 void initApp(void)
 {
@@ -385,12 +428,8 @@ void initApp(void)
 void main(void)
 {
     initHw();
-
     initApp();
-
-    //initDma();
-
-    //startPeriodicTimer(adcFreeRunTimer,1000); //1 ms
+    
 
     putsUart0("Starting AoA project\n");
 
@@ -400,10 +439,11 @@ void main(void)
         audioProcess();
         alwaysEvents();
 
-        /*
+        #ifdef DMAENABLED
         if(UDMA_ERRCLR_R & 0x1) {
             putsUart0("Bus error\n");
-        } 
-        */
+        }
+        #endif 
+
     }
 }
