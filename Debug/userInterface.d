@@ -18,6 +18,7 @@ userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.
 userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h
 userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/ctype.h
 userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_isfuncdcl.h
+userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_isfuncdef.h
 userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/inttypes.h
 userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_inttypes.h
 userInterface.obj: ../tm4c123gh6pm.h
@@ -26,6 +27,7 @@ userInterface.obj: ../main.h
 userInterface.obj: ../timer.h
 userInterface.obj: ../uart0.h
 userInterface.obj: ../eeprom.h
+userInterface.obj: ../wait.h
 
 ../userInterface.c:
 
@@ -63,6 +65,8 @@ userInterface.obj: ../eeprom.h
 
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_isfuncdcl.h:
 
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_isfuncdef.h:
+
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/inttypes.h:
 
 /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_inttypes.h:
@@ -78,4 +82,6 @@ userInterface.obj: ../eeprom.h
 ../uart0.h:
 
 ../eeprom.h:
+
+../wait.h:
 

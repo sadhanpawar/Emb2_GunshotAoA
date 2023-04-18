@@ -41,6 +41,7 @@ typedef struct
 {
     uint32_t timer;
     uint32_t order;
+    uint8_t index;
 }peekDetectOrder_t;
 
 void initApp(void);

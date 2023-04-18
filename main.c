@@ -23,6 +23,10 @@
 #include "eeprom.h"
 #include "dma.h"
 
+/******************************************************************
+ * NOTE : Optimisation level should be local optimisation to overcome
+ * buffer overflow
+ */
 bool const iirFilterEnable = false;
 bool const dmaEnable = false;
 uint16_t mic1Samples[NO_OF_SAMPLES] = {0};
@@ -36,12 +40,12 @@ uint32_t mic1SamplesAvg = UINT_MAX;
 uint32_t mic2SamplesAvg = UINT_MAX;
 uint32_t mic3SamplesAvg = UINT_MAX;
 
-uint32_t threshold = 1000;
+uint32_t threshold = 300;
 uint16_t timeConstant = 0;
 uint16_t backOff = 0;
 uint16_t holdOff = 0;
 uint16_t hysteresis = 0;
-bool tdoaEnable = false;
+bool tdoaEnable = true;
 bool partialSets = false;
 uint16_t aoaValue = 0;
 
@@ -61,12 +65,15 @@ int rolledIdx = 0;
 uint8_t threeSampleDetCount = 0;
 uint32_t peekTimeout = 0;
 
+uint32_t const constK = 2;
+
 #define DEBUG
 #define FIRFILTER 0
 #define IIRFILTER 1
 #define FILTER FIRFILTER
 //#define DMAENABLED
 
+uint16_t trash = 0;
 void initHw()
 {
     // Initialize system clock to 40 MHz
@@ -81,20 +88,13 @@ void initHw()
         initDma();
     #endif
 
-    initAdc0();
     initEeprom();
+    initAdc0();
 }
 
 void aoaAdc0InterruptHandler(void)
 {
-    uint32_t* p = (uint32_t*)PORTF + 1;
-
-    if((adcTicks%166666) == 0) {
-        *p ^= 1;
-    }
-
     #if 1
-        //if(iirFilterEnable == false) {
         
         #if FILTER == FIRFILTER
 
@@ -102,57 +102,44 @@ void aoaAdc0InterruptHandler(void)
         mic2Samples[idx] = ADC0_SSFIFO0_R;
         mic3Samples[idx] = ADC0_SSFIFO0_R;
 
+        if(aoAFSM == AVERAGE_FSM) {
         mic1SamplesAvg +=   mic1Samples[idx];
         mic2SamplesAvg +=   mic2Samples[idx];
         mic3SamplesAvg +=   mic3Samples[idx];
+        }
 
         idx = (idx+1)%NO_OF_SAMPLES;
 
-//        mic1Samples[idx] = ADC0_SSFIFO0_R;
-//        mic2Samples[idx] = ADC0_SSFIFO0_R;
-//        mic3Samples[idx] = ADC0_SSFIFO0_R;
-//
-//        mic1SamplesAvg +=   mic1Samples[idx];
-//        mic2SamplesAvg +=   mic2Samples[idx];
-//        mic3SamplesAvg +=   mic3Samples[idx];
-//
-//        idx = (idx+1)%NO_OF_SAMPLES;
+        mic1Samples[idx] = ADC0_SSFIFO0_R;
+        mic2Samples[idx] = ADC0_SSFIFO0_R;
+        mic3Samples[idx] = ADC0_SSFIFO0_R;
 
-        #elif FILTER == IIRFILTER
-        //} else {
+        if(aoAFSM == AVERAGE_FSM) {
+        mic1SamplesAvg +=   mic1Samples[idx];
+        mic2SamplesAvg +=   mic2Samples[idx];
+        mic3SamplesAvg +=   mic3Samples[idx];
+        }
 
-            mic1SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic1SamplesAvg;
-            mic2SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic2SamplesAvg;
-            mic3SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic3SamplesAvg;
+        idx = (idx+1)%NO_OF_SAMPLES;
 
-            mic1SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic1SamplesAvg;
-            mic2SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic2SamplesAvg;
-            mic3SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic3SamplesAvg;
-        //}
-        #endif
-    
+        trash = ADC0_SSFIFO0_R;
+        trash = ADC0_SSFIFO0_R;
+
         if(aoAFSM == AVERAGE_FSM && !hysteresisFlag)
         {
             if((adcTicks%(timeConstant*3)) == 0) {
                 mic3SamplesAvg /= NO_OF_SAMPLES;
-                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-                //backOff = (uint16_t)(0.50 * threshold);
             }
             else if((adcTicks%(timeConstant*2)) == 0) {
                 mic2SamplesAvg /= NO_OF_SAMPLES;
-                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-                //backOff = (uint16_t)(0.50 * threshold);
             }
             else if((adcTicks%(timeConstant*1)) == 0) {
                 mic1SamplesAvg /= NO_OF_SAMPLES;
-                threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-                //backOff = (uint16_t)(0.50 * threshold);
-            }     
+            }
         }
 
         if((aoAFSM == AVERAGE_FSM && !holdOffFlag))
         {
-
             rolledIdx = idx - 1;
             
             if(rolledIdx < 0) {
@@ -166,10 +153,11 @@ void aoaAdc0InterruptHandler(void)
                 peekTimeout = adcTicks;
                 peekDetectionOrder[orderIdx].order = 1;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
+                peekDetectionOrder[orderIdx].index = rolledIdx;
                 orderIdx = (orderIdx + 1)% 3;
                 ++threeSampleDetCount;
                 #ifdef DEBUG
-                UART0_DR_R = '1';    
+                //UART0_DR_R = '1';    
                 #endif
             }
             else if(mic2Samples[rolledIdx] > mic2SamplesAvg + threshold)
@@ -179,10 +167,11 @@ void aoaAdc0InterruptHandler(void)
                 peekTimeout = adcTicks;
                 peekDetectionOrder[orderIdx].order = 2;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
+                peekDetectionOrder[orderIdx].index = rolledIdx;
                 orderIdx = (orderIdx + 1)% 3;
                 ++threeSampleDetCount;
                 #ifdef DEBUG
-                UART0_DR_R = '2';
+                //UART0_DR_R = '2';
                 #endif
             }
             else if(mic3Samples[rolledIdx] > mic3SamplesAvg + threshold)
@@ -192,10 +181,11 @@ void aoaAdc0InterruptHandler(void)
                 peekTimeout = adcTicks;
                 peekDetectionOrder[orderIdx].order = 3;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
+                peekDetectionOrder[orderIdx].index = rolledIdx;
                 orderIdx = (orderIdx + 1)% 3;
                 ++threeSampleDetCount;
                 #ifdef DEBUG
-                UART0_DR_R = '3';
+                //UART0_DR_R = '3';
                 #endif
             }
             else
@@ -203,109 +193,21 @@ void aoaAdc0InterruptHandler(void)
                 /* Do Nothing */
             }
         }
+        
+        #elif FILTER == IIRFILTER
+        //} else {
 
-        if(aoAFSM == PEAKS_FSM)
-        {
-            mic1Samples[idx] = ADC0_SSFIFO0_R;
-            mic2Samples[idx] = ADC0_SSFIFO0_R;
-            mic3Samples[idx] = ADC0_SSFIFO0_R;
+            mic1SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic1SamplesAvg;
+            mic2SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic2SamplesAvg;
+            mic3SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic3SamplesAvg;
 
-            //if((adcTicks - peekTimeout) >= 2*166666) //Timeout of 280 ~ 300us 
-            if((adcTicks - peekTimeout) >= 8333) //0.5s
-            {
-                peekTimeout = 0;
-                aoAFSM = AVERAGE_FSM;
-                ++adcTicks;
-                ADC0_ISC_R = 0x1;
-                orderIdx = 0;
-                threeSampleDetCount = 0;
-                wherePeek = 0;
-                #ifdef DEBUG
-                UART0_DR_R = 'T';
-                #endif
-                return ;
-            }
-
-            rolledIdx = idx;
-
-            if(rolledIdx < 0) {
-                rolledIdx = (NO_OF_SAMPLES - 1);
-            }
-
-            if(wherePeek == 1)
-            {
-                if((mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 2;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;
-                    ++threeSampleDetCount;
-                }
-
-                if((mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 3;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;
-                    ++threeSampleDetCount;
-                }
-            }
-
-            if(wherePeek == 2)
-            {
-                if((mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 1;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;
-                    ++threeSampleDetCount;
-                }
-                if((mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 3;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;
-                    ++threeSampleDetCount;
-                }
-            }
-
-            if(wherePeek == 3)
-            {
-                if((mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 1;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;
-                    ++threeSampleDetCount;
-                }
-                if((mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
-                {
-                    peekDetectionOrder[orderIdx].order = 2;
-                    peekDetectionOrder[orderIdx].timer = adcTicks;
-                    orderIdx = (orderIdx + 1)% 3;   
-                    ++threeSampleDetCount;
-                }
-            }
-
-            mic1SamplesAvg +=   mic1Samples[idx];
-            mic2SamplesAvg +=   mic2Samples[idx];
-            mic3SamplesAvg +=   mic3Samples[idx];
-
-            idx = (idx+1)%NO_OF_SAMPLES;
-
-        }
-        else
-        {
-            mic1Samples[idx] = ADC0_SSFIFO0_R;
-            mic2Samples[idx] = ADC0_SSFIFO0_R;
-            mic3Samples[idx] = ADC0_SSFIFO0_R;
-
-            mic1SamplesAvg +=   mic1Samples[idx];
-            mic2SamplesAvg +=   mic2Samples[idx];
-            mic3SamplesAvg +=   mic3Samples[idx];
-
-        idx = (idx+1)%NO_OF_SAMPLES;
-        }
+            mic1SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic1SamplesAvg;
+            mic2SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic2SamplesAvg;
+            mic3SamplesAvg = (alpha* ADC0_SSFIFO0_R) + (alpha - 1)*mic3SamplesAvg;
+        //}
+        #endif
+    
+        
     #endif
 
     #ifdef DMAENABLED
@@ -344,8 +246,6 @@ void audioProcess(void)
     {
         case AVERAGE_FSM:
         {
-            //setPinValue(PEAKS_DETECT_LED,0);
-            //memset(peekDetectionOrder,0,sizeof(peekDetectionOrder));
             holdOffFlag = false;
             hysteresisFlag = false;
             wherePeek = 0;
@@ -366,14 +266,13 @@ void audioProcess(void)
 
                 snprintf(str,sizeof(str),"BackOff: %"PRIu16"\n",backOff);
                 putsUart0(str);
-                waitMicrosecond(100000);
+                waitMicrosecond(10000);
             }
         }
         break;
 
         case PEAKS_FSM:
         {
-            //setPinValue(PEAKS_DETECT_LED,1);
             
             if(partialSets) {
                 snprintf(str,sizeof(str),"peek detected at %"PRIu8"\n",wherePeek);
@@ -404,6 +303,7 @@ void audioProcess(void)
                 hysteresisTemp = adcTicks;
                 aoAFSM = AVERAGE_FSM;
                 threeSampleDetCount = 0;
+                aoaValue = 60 + constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer);
             }    
         }
         break;
@@ -414,8 +314,176 @@ void audioProcess(void)
 
 void calculateAvgs(void)
 {
-    threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+    //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
     //backOff = (uint16_t)(0.50 * threshold);
+
+    if(aoAFSM == AVERAGE_FSM && !hysteresisFlag)
+    {
+        //threshold = (1.5 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+        #if 0
+        if((adcTicks%(timeConstant*3)) == 0) {
+            mic3SamplesAvg /= NO_OF_SAMPLES;
+            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+            //backOff = (uint16_t)(0.50 * threshold);
+        }
+        else if((adcTicks%(timeConstant*2)) == 0) {
+            mic2SamplesAvg /= NO_OF_SAMPLES;
+            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+            //backOff = (uint16_t)(0.50 * threshold);
+        }
+        else if((adcTicks%(timeConstant*1)) == 0) {
+            mic1SamplesAvg /= NO_OF_SAMPLES;
+            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
+            //backOff = (uint16_t)(0.50 * threshold);
+        }
+        #endif     
+    }
+
+    #if 0
+    if((aoAFSM == AVERAGE_FSM && !holdOffFlag))
+    {
+        rolledIdx = idx - 1;
+        
+        if(rolledIdx < 0) {
+            rolledIdx = (NO_OF_SAMPLES - 1);
+        }
+
+        if(mic1Samples[rolledIdx] > mic1SamplesAvg + threshold)
+        {
+            aoAFSM = PEAKS_FSM;
+            wherePeek = 1;
+            peekTimeout = adcTicks;
+            peekDetectionOrder[orderIdx].order = 1;
+            peekDetectionOrder[orderIdx].timer = adcTicks;
+            peekDetectionOrder[orderIdx].index = rolledIdx;
+            orderIdx = (orderIdx + 1)% 3;
+            ++threeSampleDetCount;
+            #ifdef DEBUG
+            UART0_DR_R = '1';    
+            #endif
+        }
+        else if(mic2Samples[rolledIdx] > mic2SamplesAvg + threshold)
+        {
+            aoAFSM = PEAKS_FSM;
+            wherePeek = 2;
+            peekTimeout = adcTicks;
+            peekDetectionOrder[orderIdx].order = 2;
+            peekDetectionOrder[orderIdx].timer = adcTicks;
+            peekDetectionOrder[orderIdx].index = rolledIdx;
+            orderIdx = (orderIdx + 1)% 3;
+            ++threeSampleDetCount;
+            #ifdef DEBUG
+            UART0_DR_R = '2';
+            #endif
+        }
+        else if(mic3Samples[rolledIdx] > mic3SamplesAvg + threshold)
+        {
+            aoAFSM = PEAKS_FSM;
+            wherePeek = 3;
+            peekTimeout = adcTicks;
+            peekDetectionOrder[orderIdx].order = 3;
+            peekDetectionOrder[orderIdx].timer = adcTicks;
+            peekDetectionOrder[orderIdx].index = rolledIdx;
+            orderIdx = (orderIdx + 1)% 3;
+            ++threeSampleDetCount;
+            #ifdef DEBUG
+            UART0_DR_R = '3';
+            #endif
+        }
+        else
+        {
+            /* Do Nothing */
+        }
+    }
+    #endif
+
+    if(aoAFSM == PEAKS_FSM)
+    {
+        //if((adcTicks - peekTimeout) >= 2*166666) //Timeout of 280 ~ 300us 
+        #if 1
+        if((adcTicks - peekTimeout) >= 166666) //1s working
+        {
+            peekTimeout = 0;
+            aoAFSM = AVERAGE_FSM;
+            orderIdx = 0;
+            threeSampleDetCount = 0;
+            wherePeek = 0;
+            #ifdef DEBUG
+            UART0_DR_R = 'T';
+            #endif
+            return ;
+        }
+        #endif
+
+        rolledIdx = (peekDetectionOrder[0].index);
+        rolledIdx = (rolledIdx + 1) % NO_OF_SAMPLES;
+
+        if(rolledIdx < 0) {
+            rolledIdx = (NO_OF_SAMPLES - 1);
+        }
+
+        if(wherePeek == 1)
+        {
+            if((mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 2;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+
+            if((mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 3;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+        }
+
+        if(wherePeek == 2)
+        {
+            if((mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 1;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+            if((mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 3;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+        }
+
+        if(wherePeek == 3)
+        {
+            if((mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 1;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+            if((mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
+            {
+                peekDetectionOrder[orderIdx].order = 2;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;   
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+            }
+        }
+    }
+
 }
 void initApp(void)
 {
@@ -434,6 +502,19 @@ void main(void)
     putsUart0("Starting AoA project\n");
 
     while(true) {
+
+        #ifdef DEBUG
+        if(ADC0_USTAT_R & ADC_USTAT_UV0) {
+            ADC0_USTAT_R = ADC_USTAT_UV0;
+            //putsUart0("ADC0 underflow \n");
+        }
+
+        if(ADC0_OSTAT_R & ADC_OSTAT_OV0) {
+            ADC0_OSTAT_R = ADC_OSTAT_OV0;
+            putsUart0("ADC0 overflow \n");
+        }
+        #endif
+
         processShell();
         calculateAvgs();
         audioProcess();

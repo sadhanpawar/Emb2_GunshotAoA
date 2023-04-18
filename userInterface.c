@@ -15,6 +15,7 @@
 #include "main.h"
 #include "uart0.h"
 #include "eeprom.h"
+#include "wait.h"
 
 uint8_t count = 0;
 char strInput[MAX_CHARS+1];
@@ -62,7 +63,7 @@ void processShell()
                 }
                 else
                 {
-                    snprintf(str,sizeof(str),"%"PRIu16"ticks\n",timeConstant);
+                    snprintf(str,sizeof(str),"%"PRIu16"\n",timeConstant);
                     putsUart0(str);
                 }
             }
@@ -107,13 +108,21 @@ void processShell()
             }
             if (strcmp(token, "aoa") == 0)
             {
-                snprintf(str,sizeof(str),"%"PRIu16"\n",aoaValue);
-                putsUart0(str);  
+                token = strtok(NULL, " ");
+                if (strlen(token) > 0)
+                {
+                    if (strcmp(token, "always") == 0)
+                    {
+                        alwaysEventAoa = true;
+                    }
+                }
+                else
+                {
+                    snprintf(str,sizeof(str),"%"PRIu16"\n",aoaValue);
+                    putsUart0(str);  
+                }
             }
-            if (strcmp(token, "aoa always") == 0)
-            {
-                alwaysEventAoa = true;
-            }
+            
             if (strcmp(token, "tdoa") == 0)
             {
                 token = strtok(NULL, " ");
@@ -212,10 +221,12 @@ void alwaysEvents(void)
     char str[30] = {0};
 
     if(alwaysEventAoa) {
-        snprintf(str,sizeof(str),"%"PRIu16"\n",aoaValue);
-        putsUart0(str); 
+        snprintf(str,sizeof(str),"AOA :%"PRIu16"\n",aoaValue);
+        putsUart0(str);
+        waitMicrosecond(100);
     }
 
+    /*
     if(tdoaEnable) {
 
     }
@@ -223,5 +234,6 @@ void alwaysEvents(void)
     if(partialSets) {
 
     }
+    */
 
 }
