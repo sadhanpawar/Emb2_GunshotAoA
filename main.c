@@ -22,6 +22,7 @@
 #include "timer.h"
 #include "eeprom.h"
 #include "dma.h"
+#include "userInterface.h"
 
 /******************************************************************
  * NOTE : Optimisation level should be local optimisation to overcome
@@ -40,7 +41,7 @@ uint32_t mic1SamplesAvg = UINT_MAX;
 uint32_t mic2SamplesAvg = UINT_MAX;
 uint32_t mic3SamplesAvg = UINT_MAX;
 
-uint32_t threshold = 300;
+uint32_t threshold = 500;
 uint16_t timeConstant = 0;
 uint16_t backOff = 0;
 uint16_t holdOff = 0;
@@ -234,14 +235,14 @@ void audioProcess(void)
     
     if(startTimers)
     {
-        if( (adcTicks - holdOffTemp)  >= holdOff*1000)
+        if( (adcTicks - holdOffTemp)  >= (uint32_t)(holdOff*1000))
         {
-            holdOffFlag = true;
+            holdOffFlag = false;
         }
 
-        if( (adcTicks - hysteresisTemp)  >= hysteresis*1000)
+        if( (adcTicks - hysteresisTemp)  >= (uint32_t)(hysteresis*1000))
         {
-            hysteresisFlag = true;
+            hysteresisFlag = false;
         }
     }
 
@@ -249,8 +250,8 @@ void audioProcess(void)
     {
         case AVERAGE_FSM:
         {
-            holdOffFlag = false;
-            hysteresisFlag = false;
+            //holdOffFlag = false;
+            //hysteresisFlag = false;
             wherePeek = 0;
             orderIdx = 0;
             secondPeek = 0;
@@ -308,9 +309,13 @@ void audioProcess(void)
                 aoAFSM = AVERAGE_FSM;
                 threeSampleDetCount = 0;
                 secondPeek = 0;
+                holdOffFlag = true;
+                hysteresisFlag = true;
                 aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
-                snprintf(str,sizeof(str),"AOA : %"PRIu16"\n",aoaValue);
-                putsUart0(str);
+                if(alwaysEventAoa) {
+                    snprintf(str,sizeof(str),"AOA : %"PRIu16"\n",aoaValue);
+                    putsUart0(str);
+                }
             }    
         }
         break;
@@ -408,7 +413,7 @@ void calculateAvgs(void)
     {
         //if((adcTicks - peekTimeout) >= 2*166666) //Timeout of 280 ~ 300us 
         #if 1
-        if((adcTicks - peekTimeout) >= 166666) //1s working
+        if((adcTicks - peekTimeout) >= 300) //1s working
         {
             peekTimeout = 0;
             aoAFSM = AVERAGE_FSM;

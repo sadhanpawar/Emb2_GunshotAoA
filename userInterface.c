@@ -221,9 +221,9 @@ void alwaysEvents(void)
     char str[30] = {0};
 
     if(alwaysEventAoa) {
-        snprintf(str,sizeof(str),"AOA :%"PRIu16"\n",aoaValue);
-        putsUart0(str);
-        waitMicrosecond(100);
+        //snprintf(str,sizeof(str),"AOA :%"PRIu16"\n",aoaValue);
+        //putsUart0(str);
+        //waitMicrosecond(100);
     }
 
     /*

@@ -10,6 +10,8 @@
 
 #define MAX_CHARS 80
 
+extern bool alwaysEventAoa;
+
 void processShell(void);
 uint16_t asciiToUint16(const char str[]);
 
