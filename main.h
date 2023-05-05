@@ -46,6 +46,8 @@ typedef struct
 
 void initApp(void);
 void calculateAvgs(void);
+void calcAoa(void);
+void setColorWheel(uint16_t angle);
 
 /*60+k(t3-t2)*/
 #endif

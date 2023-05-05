@@ -23,6 +23,7 @@
 #include "eeprom.h"
 #include "dma.h"
 #include "userInterface.h"
+#include "rgb_led.h"
 
 /******************************************************************
  * NOTE : Optimisation level should be local optimisation to overcome
@@ -69,7 +70,7 @@ uint32_t peekTimeout = 0;
 
 uint16_t angles[] = {0,330,210,90}; //0th idx discarded
 
-float const constK = 0.9;
+float const constK = 1.2;
 
 #define DEBUG
 #define FIRFILTER 0
@@ -94,6 +95,7 @@ void initHw()
 
     initEeprom();
     initAdc0();
+    initRgb();
 }
 
 void aoaAdc0InterruptHandler(void)
@@ -106,28 +108,84 @@ void aoaAdc0InterruptHandler(void)
         mic2Samples[idx] = ADC0_SSFIFO0_R;
         mic3Samples[idx] = ADC0_SSFIFO0_R;
 
-        if(aoAFSM == AVERAGE_FSM) {
-        mic1SamplesAvg +=   mic1Samples[idx];
-        mic2SamplesAvg +=   mic2Samples[idx];
-        mic3SamplesAvg +=   mic3Samples[idx];
-        }
-
         idx = (idx+1)%NO_OF_SAMPLES;
 
         mic1Samples[idx] = ADC0_SSFIFO0_R;
         mic2Samples[idx] = ADC0_SSFIFO0_R;
         mic3Samples[idx] = ADC0_SSFIFO0_R;
 
+        
+        trash = ADC0_SSFIFO0_R;
+        trash = ADC0_SSFIFO0_R;
+
+
+        if((aoAFSM == AVERAGE_FSM) && !holdOffFlag)
+        {
+            rolledIdx = idx - 1;
+            
+            if(rolledIdx < 0) {
+                rolledIdx = (NO_OF_SAMPLES - 1);
+            }
+
+            if(mic1Samples[rolledIdx] > (mic1SamplesAvg + threshold))
+            {
+                aoAFSM = PEAKS_FSM;
+                wherePeek = 1;
+                peekTimeout = adcTicks;
+                peekDetectionOrder[0].order = 1;
+                peekDetectionOrder[0].timer = adcTicks;
+                peekDetectionOrder[0].index = rolledIdx;
+                orderIdx = 1;
+                threeSampleDetCount = 1;
+                #ifdef DEBUG
+                //UART0_DR_R = '1';    
+                #endif
+            }
+            else if(mic2Samples[rolledIdx] > (mic2SamplesAvg + threshold))
+            {
+                aoAFSM = PEAKS_FSM;
+                wherePeek = 2;
+                peekTimeout = adcTicks;
+                peekDetectionOrder[0].order = 2;
+                peekDetectionOrder[0].timer = adcTicks;
+                peekDetectionOrder[0].index = rolledIdx;
+                orderIdx = 1;
+                threeSampleDetCount = 1;
+                #ifdef DEBUG
+                //UART0_DR_R = '2';
+                #endif
+            }
+            else if(mic3Samples[rolledIdx] > (mic3SamplesAvg + threshold))
+            {
+                aoAFSM = PEAKS_FSM;
+                wherePeek = 3;
+                peekTimeout = adcTicks;
+                peekDetectionOrder[0].order = 3;
+                peekDetectionOrder[0].timer = adcTicks;
+                peekDetectionOrder[0].index = rolledIdx;
+                orderIdx = 1;
+                threeSampleDetCount = 1;
+                #ifdef DEBUG
+                //UART0_DR_R = '3';
+                #endif
+            }
+            else
+            {
+                /* Do Nothing */
+            }
+        }
+        
         if(aoAFSM == AVERAGE_FSM) {
         mic1SamplesAvg +=   mic1Samples[idx];
         mic2SamplesAvg +=   mic2Samples[idx];
         mic3SamplesAvg +=   mic3Samples[idx];
+
+        mic1SamplesAvg +=   mic1Samples[idx - 1];
+        mic2SamplesAvg +=   mic2Samples[idx - 1];
+        mic3SamplesAvg +=   mic3Samples[idx - 1];
         }
 
         idx = (idx+1)%NO_OF_SAMPLES;
-
-        trash = ADC0_SSFIFO0_R;
-        trash = ADC0_SSFIFO0_R;
 
         if(aoAFSM == AVERAGE_FSM && !hysteresisFlag)
         {
@@ -142,62 +200,7 @@ void aoaAdc0InterruptHandler(void)
             }
         }
 
-        if((aoAFSM == AVERAGE_FSM && !holdOffFlag))
-        {
-            rolledIdx = idx - 1;
-            
-            if(rolledIdx < 0) {
-                rolledIdx = (NO_OF_SAMPLES - 1);
-            }
 
-            if(mic1Samples[rolledIdx] > mic1SamplesAvg + threshold)
-            {
-                aoAFSM = PEAKS_FSM;
-                wherePeek = 1;
-                peekTimeout = adcTicks;
-                peekDetectionOrder[orderIdx].order = 1;
-                peekDetectionOrder[orderIdx].timer = adcTicks;
-                peekDetectionOrder[orderIdx].index = rolledIdx;
-                orderIdx = (orderIdx + 1)% 3;
-                ++threeSampleDetCount;
-                #ifdef DEBUG
-                //UART0_DR_R = '1';    
-                #endif
-            }
-            else if(mic2Samples[rolledIdx] > mic2SamplesAvg + threshold)
-            {
-                aoAFSM = PEAKS_FSM;
-                wherePeek = 2;
-                peekTimeout = adcTicks;
-                peekDetectionOrder[orderIdx].order = 2;
-                peekDetectionOrder[orderIdx].timer = adcTicks;
-                peekDetectionOrder[orderIdx].index = rolledIdx;
-                orderIdx = (orderIdx + 1)% 3;
-                ++threeSampleDetCount;
-                #ifdef DEBUG
-                //UART0_DR_R = '2';
-                #endif
-            }
-            else if(mic3Samples[rolledIdx] > mic3SamplesAvg + threshold)
-            {
-                aoAFSM = PEAKS_FSM;
-                wherePeek = 3;
-                peekTimeout = adcTicks;
-                peekDetectionOrder[orderIdx].order = 3;
-                peekDetectionOrder[orderIdx].timer = adcTicks;
-                peekDetectionOrder[orderIdx].index = rolledIdx;
-                orderIdx = (orderIdx + 1)% 3;
-                ++threeSampleDetCount;
-                #ifdef DEBUG
-                //UART0_DR_R = '3';
-                #endif
-            }
-            else
-            {
-                /* Do Nothing */
-            }
-        }
-        
         #elif FILTER == IIRFILTER
         //} else {
 
@@ -228,7 +231,6 @@ void aoaAdc0InterruptHandler(void)
 void audioProcess(void)
 {
     char str[50];
-    uint8_t i;
     static bool startTimers = false;
     static uint32_t holdOffTemp = 0;
     static uint32_t hysteresisTemp = 0;
@@ -256,15 +258,24 @@ void audioProcess(void)
             orderIdx = 0;
             secondPeek = 0;
 
+            #if 0
             if(partialSets) {
                 snprintf(str,sizeof(str),"Mic1 Avg: %"PRIu32"\n",mic1SamplesAvg);
-                putsUart0(str);
+                //putsUart0(str);
 
                 snprintf(str,sizeof(str),"Mic2 Avg: %"PRIu32"\n",mic2SamplesAvg);
-                putsUart0(str);
+                //putsUart0(str);
 
                 snprintf(str,sizeof(str),"Mic3 Avg: %"PRIu32"\n",mic3SamplesAvg);
+                //putsUart0(str);
+
+                snprintf(str,sizeof(str),"Partial Peek detected at: %"PRIu8"\n",wherePeek);
                 putsUart0(str);
+
+                putsUart0("***********************************************************\n");
+                snprintf(str,sizeof(str),"3 sample detect: %"PRIu8"\n",threeSampleDetCount);
+                putsUart0(str);
+                putsUart0("***********************************************************\n");
 
                 snprintf(str,sizeof(str),"Threshold: %"PRIu32"\n",threshold);
                 putsUart0(str);
@@ -273,14 +284,15 @@ void audioProcess(void)
                 putsUart0(str);
                 waitMicrosecond(10000);
             }
+            #endif
         }
         break;
 
         case PEAKS_FSM:
         {
-            
+            #if 1
             if(partialSets) {
-                snprintf(str,sizeof(str),"peek detected at %"PRIu8"\n",wherePeek);
+                snprintf(str,sizeof(str),"Partial peek detected at %"PRIu8"\n",wherePeek);
                 putsUart0(str);
 
                 #if 1
@@ -290,32 +302,20 @@ void audioProcess(void)
                 putsUart0("***********************************************************\n");
                 #endif
             }
-            
-            if(tdoaEnable && threeSampleDetCount >= 3) {
-            //if(tdoaEnable &&  orderIdx == 0) {    
-                snprintf(str,sizeof(str),"peek detected at %"PRIu8"\n",wherePeek);
-                putsUart0(str);
+            #endif
 
-                putsUart0("Peeks order\n");
-                for(i = 0; i < 3; i++) {
-                    snprintf(str,sizeof(str),"%"PRIu8" %"PRIu32"\n",peekDetectionOrder[i].order, peekDetectionOrder[i].timer);
-                    putsUart0(str);
-                }
+            if(threeSampleDetCount == 3) {   
 
                 // only after valid event
                 startTimers = true;
                 holdOffTemp = adcTicks;
                 hysteresisTemp = adcTicks;
-                aoAFSM = AVERAGE_FSM;
                 threeSampleDetCount = 0;
                 secondPeek = 0;
                 holdOffFlag = true;
                 hysteresisFlag = true;
-                aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
-                if(alwaysEventAoa) {
-                    snprintf(str,sizeof(str),"AOA : %"PRIu16"\n",aoaValue);
-                    putsUart0(str);
-                }
+                calcAoa();
+                aoAFSM = AVERAGE_FSM;
             }    
         }
         break;
@@ -323,121 +323,179 @@ void audioProcess(void)
         default: break;
     }
 }
+void calcAoa(void)
+{
+    char str[50];
+    uint8_t i;
+
+    switch(peekDetectionOrder[0].order)
+    {
+        case 1:
+        {
+            if(peekDetectionOrder[1].order > peekDetectionOrder[2].order) {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+                else
+                {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+
+            } else {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                } else {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+            }
+        }break;
+
+        case 2:
+        {
+            if(peekDetectionOrder[1].order < peekDetectionOrder[2].order) {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+                else
+                {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+
+            } else {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                } else {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+            }
+
+        }break;
+
+        case 3:
+        {
+            if(peekDetectionOrder[1].order > peekDetectionOrder[2].order) {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+                else
+                {
+                    aoaValue = (angles[peekDetectionOrder[0].order] + (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+
+            } else {
+                if(peekDetectionOrder[2].timer - peekDetectionOrder[1].timer > 10) {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)(constK * (peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                } else {
+                    aoaValue = (angles[peekDetectionOrder[0].order] - (uint16_t)((peekDetectionOrder[2].timer - peekDetectionOrder[1].timer)));
+                    aoaValue %= 360;
+                }
+            }
+
+        }break;
+
+        default:break;
+    }
+
+    if(tdoaEnable) {
+    snprintf(str,sizeof(str),"peek detected at %"PRIu8"\n",peekDetectionOrder[0].order);
+    putsUart0(str);
+    putsUart0("Peeks order\n");
+    for(i = 0; i < 3; i++) {
+        snprintf(str,sizeof(str),"%"PRIu8" %"PRIu32"\n",peekDetectionOrder[i].order, peekDetectionOrder[i].timer);
+        putsUart0(str);
+    }
+    }
+    if(alwaysEventAoa) {
+        snprintf(str,sizeof(str),"AOA : %"PRIu16"\n",aoaValue);
+        putsUart0(str);
+        setColorWheel(aoaValue);
+    }
+}
+
+void setColorWheel(uint16_t angle)
+{
+    if( angle >= 0 && angle <= 30) {
+        setRgbColor(1023, 0, 0); // red
+    } else if ( angle > 30 && angle <= 60) {
+        setRgbColor(1023, 384, 0); //orange
+    } else if (angle > 60 && angle <= 90) {
+        setRgbColor(1023, 1023, 8); //yellow
+    } else if (angle > 90 && angle <= 150) {
+        setRgbColor(0, 1023, 0);    //green
+    } else if (angle > 150 && angle <= 210) {
+        setRgbColor(0, 1023, 1023); //cyan
+    } else if (angle > 210 && angle <= 270) {
+        setRgbColor(0, 0, 1023);    //blue
+    } else if (angle > 270 && angle <= 330) {
+        setRgbColor(1023, 0, 1023);    //magenta
+    } else if (angle > 330 && angle <= 360) {
+        setRgbColor(1023, 0, 0);    //red
+    } else {
+        /* Do nothing */
+    }
+}
 
 void calculateAvgs(void)
 {
-    //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-    //backOff = (uint16_t)(0.50 * threshold);
-
-    if(aoAFSM == AVERAGE_FSM && !hysteresisFlag)
-    {
-        //threshold = (1.5 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-        #if 0
-        if((adcTicks%(timeConstant*3)) == 0) {
-            mic3SamplesAvg /= NO_OF_SAMPLES;
-            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-            //backOff = (uint16_t)(0.50 * threshold);
-        }
-        else if((adcTicks%(timeConstant*2)) == 0) {
-            mic2SamplesAvg /= NO_OF_SAMPLES;
-            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-            //backOff = (uint16_t)(0.50 * threshold);
-        }
-        else if((adcTicks%(timeConstant*1)) == 0) {
-            mic1SamplesAvg /= NO_OF_SAMPLES;
-            //threshold = (1.50 * (mic1SamplesAvg + mic2SamplesAvg + mic3SamplesAvg)) / 3;
-            //backOff = (uint16_t)(0.50 * threshold);
-        }
-        #endif     
-    }
-
-    #if 0
-    if((aoAFSM == AVERAGE_FSM && !holdOffFlag))
-    {
-        rolledIdx = idx - 1;
-        
-        if(rolledIdx < 0) {
-            rolledIdx = (NO_OF_SAMPLES - 1);
-        }
-
-        if(mic1Samples[rolledIdx] > mic1SamplesAvg + threshold)
-        {
-            aoAFSM = PEAKS_FSM;
-            wherePeek = 1;
-            peekTimeout = adcTicks;
-            peekDetectionOrder[orderIdx].order = 1;
-            peekDetectionOrder[orderIdx].timer = adcTicks;
-            peekDetectionOrder[orderIdx].index = rolledIdx;
-            orderIdx = (orderIdx + 1)% 3;
-            ++threeSampleDetCount;
-            #ifdef DEBUG
-            UART0_DR_R = '1';    
-            #endif
-        }
-        else if(mic2Samples[rolledIdx] > mic2SamplesAvg + threshold)
-        {
-            aoAFSM = PEAKS_FSM;
-            wherePeek = 2;
-            peekTimeout = adcTicks;
-            peekDetectionOrder[orderIdx].order = 2;
-            peekDetectionOrder[orderIdx].timer = adcTicks;
-            peekDetectionOrder[orderIdx].index = rolledIdx;
-            orderIdx = (orderIdx + 1)% 3;
-            ++threeSampleDetCount;
-            #ifdef DEBUG
-            UART0_DR_R = '2';
-            #endif
-        }
-        else if(mic3Samples[rolledIdx] > mic3SamplesAvg + threshold)
-        {
-            aoAFSM = PEAKS_FSM;
-            wherePeek = 3;
-            peekTimeout = adcTicks;
-            peekDetectionOrder[orderIdx].order = 3;
-            peekDetectionOrder[orderIdx].timer = adcTicks;
-            peekDetectionOrder[orderIdx].index = rolledIdx;
-            orderIdx = (orderIdx + 1)% 3;
-            ++threeSampleDetCount;
-            #ifdef DEBUG
-            UART0_DR_R = '3';
-            #endif
-        }
-        else
-        {
-            /* Do Nothing */
-        }
-    }
-    #endif
+	int roldIdx = 0;
 
     if(aoAFSM == PEAKS_FSM)
     {
-        //if((adcTicks - peekTimeout) >= 2*166666) //Timeout of 280 ~ 300us 
         #if 1
-        if((adcTicks - peekTimeout) >= 300) //1s working
+        if((adcTicks - peekTimeout) >= 300)
         {
+            if(partialSets) {
+                char str[50];
+                uint8_t i;
+
+                snprintf(str,sizeof(str),"Partial peek detected at %"PRIu8"\n",wherePeek);
+                putsUart0(str);
+
+                //putsUart0("***********************************************************\n");
+                snprintf(str,sizeof(str),"3 sample detect: %"PRIu8"\n",threeSampleDetCount);
+                putsUart0(str);
+                //putsUart0("***********************************************************\n");
+                
+                putsUart0("Peeks order\n");
+                for(i = 0; i < 3; i++) {
+                    snprintf(str,sizeof(str),"%"PRIu8" %"PRIu32"\n",peekDetectionOrder[i].order, peekDetectionOrder[i].timer);
+                    putsUart0(str);
+                }
+                putsUart0("Timeout");
+            }
+
             peekTimeout = 0;
-            aoAFSM = AVERAGE_FSM;
             orderIdx = 0;
             threeSampleDetCount = 0;
             wherePeek = 0;
             secondPeek = 0;
-            #ifdef DEBUG
-            UART0_DR_R = 'T';
-            #endif
+		    aoAFSM = AVERAGE_FSM;
+            
             return ;
         }
         #endif
 
-        rolledIdx = (peekDetectionOrder[0].index);
-        rolledIdx = (rolledIdx + 1) % NO_OF_SAMPLES;
+        roldIdx = (peekDetectionOrder[0].index);
+        roldIdx = (roldIdx + 1) % NO_OF_SAMPLES;
 
-        if(rolledIdx < 0) {
-            rolledIdx = (NO_OF_SAMPLES - 1);
+        if(roldIdx < 0) {
+            roldIdx = (NO_OF_SAMPLES - 1);
         }
 
-        if(wherePeek == 1)
+        if((wherePeek == 1) && (threeSampleDetCount <3) )
         {
-            if(((secondPeek == 0) || (secondPeek == 2)) && (mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
+            if(((secondPeek == 0) || (secondPeek == 2)) && (mic2Samples[roldIdx] > (mic2SamplesAvg + threshold - backOff)))
             {
                 peekDetectionOrder[orderIdx].order = 2;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
@@ -447,7 +505,7 @@ void calculateAvgs(void)
                 secondPeek = 3; // go to next peek
             }
 
-            if(((secondPeek == 0) || (secondPeek == 3)) && (mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
+            if(((secondPeek == 0) || (secondPeek == 3)) && (mic3Samples[roldIdx] > (mic3SamplesAvg + threshold - backOff)))
             {
                 peekDetectionOrder[orderIdx].order = 3;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
@@ -458,18 +516,9 @@ void calculateAvgs(void)
             }
         }
 
-        if(wherePeek == 2)
+        if((wherePeek == 2) && (threeSampleDetCount <3))
         {
-            if(((secondPeek == 0) || (secondPeek == 1)) && (mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
-            {
-                peekDetectionOrder[orderIdx].order = 1;
-                peekDetectionOrder[orderIdx].timer = adcTicks;
-                orderIdx = (orderIdx + 1)% 3;
-                ++threeSampleDetCount;
-                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
-                secondPeek = 3;
-            }
-            if(((secondPeek == 0) || (secondPeek == 3)) && (mic3Samples[rolledIdx] > mic3SamplesAvg + threshold - backOff))
+            if(((secondPeek == 0) || (secondPeek == 3)) && (mic3Samples[roldIdx] > (mic3SamplesAvg + threshold - backOff)))
             {
                 peekDetectionOrder[orderIdx].order = 3;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
@@ -478,11 +527,20 @@ void calculateAvgs(void)
                 (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
                 secondPeek = 1;
             }
+            if(((secondPeek == 0) || (secondPeek == 1)) && (mic1Samples[roldIdx] > (mic1SamplesAvg + threshold - backOff)))
+            {
+                peekDetectionOrder[orderIdx].order = 1;
+                peekDetectionOrder[orderIdx].timer = adcTicks;
+                orderIdx = (orderIdx + 1)% 3;
+                ++threeSampleDetCount;
+                (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
+                secondPeek = 3;
+            } 
         }
 
-        if(wherePeek == 3)
+        if((wherePeek == 3) && (threeSampleDetCount <3))
         {
-            if(((secondPeek == 0) || (secondPeek == 1)) && (mic1Samples[rolledIdx] > mic1SamplesAvg + threshold - backOff))
+            if(((secondPeek == 0) || (secondPeek == 1)) && (mic1Samples[roldIdx] > (mic1SamplesAvg + threshold - backOff)))
             {
                 peekDetectionOrder[orderIdx].order = 1;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
@@ -491,7 +549,7 @@ void calculateAvgs(void)
                 (peekDetectionOrder[0].index) = (peekDetectionOrder[0].index + 1) % NO_OF_SAMPLES;
                 secondPeek = 2;
             }
-            if(((secondPeek == 0) || (secondPeek == 2)) && (mic2Samples[rolledIdx] > mic2SamplesAvg + threshold - backOff))
+            if(((secondPeek == 0) || (secondPeek == 2)) && (mic2Samples[roldIdx] > (mic2SamplesAvg + threshold - backOff)))
             {
                 peekDetectionOrder[orderIdx].order = 2;
                 peekDetectionOrder[orderIdx].timer = adcTicks;
@@ -518,14 +576,13 @@ void main(void)
     initApp();
     
 
-    putsUart0("Starting AoA project\n");
+    putsUart0("\n\nStarting AoA project\n");
 
     while(true) {
 
         #ifdef DEBUG
         if(ADC0_USTAT_R & ADC_USTAT_UV0) {
             ADC0_USTAT_R = ADC_USTAT_UV0;
-            //putsUart0("ADC0 underflow \n");
         }
 
         if(ADC0_OSTAT_R & ADC_OSTAT_OV0) {

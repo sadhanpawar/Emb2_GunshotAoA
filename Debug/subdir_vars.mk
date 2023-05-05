@@ -14,6 +14,7 @@ C_SRCS += \
 ../gpio.c \
 ../main.c \
 ../nvic.c \
+../rgb_led.c \
 ../timer.c \
 ../tm4c123gh6pm_startup_ccs.c \
 ../uart0.c \
@@ -28,6 +29,7 @@ C_DEPS += \
 ./gpio.d \
 ./main.d \
 ./nvic.d \
+./rgb_led.d \
 ./timer.d \
 ./tm4c123gh6pm_startup_ccs.d \
 ./uart0.d \
@@ -42,6 +44,7 @@ OBJS += \
 ./gpio.obj \
 ./main.obj \
 ./nvic.obj \
+./rgb_led.obj \
 ./timer.obj \
 ./tm4c123gh6pm_startup_ccs.obj \
 ./uart0.obj \
@@ -56,6 +59,7 @@ OBJS__QUOTED += \
 "gpio.obj" \
 "main.obj" \
 "nvic.obj" \
+"rgb_led.obj" \
 "timer.obj" \
 "tm4c123gh6pm_startup_ccs.obj" \
 "uart0.obj" \
@@ -70,6 +74,7 @@ C_DEPS__QUOTED += \
 "gpio.d" \
 "main.d" \
 "nvic.d" \
+"rgb_led.d" \
 "timer.d" \
 "tm4c123gh6pm_startup_ccs.d" \
 "uart0.d" \
@@ -84,6 +89,7 @@ C_SRCS__QUOTED += \
 "../gpio.c" \
 "../main.c" \
 "../nvic.c" \
+"../rgb_led.c" \
 "../timer.c" \
 "../tm4c123gh6pm_startup_ccs.c" \
 "../uart0.c" \

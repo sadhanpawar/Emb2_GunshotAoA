@@ -31,6 +31,7 @@ main.obj: ../main.h
 main.obj: ../timer.h
 main.obj: ../eeprom.h
 main.obj: ../dma.h
+main.obj: ../rgb_led.h
 
 ../main.c:
 
@@ -93,4 +94,6 @@ main.obj: ../dma.h
 ../eeprom.h:
 
 ../dma.h:
+
+../rgb_led.h:
 

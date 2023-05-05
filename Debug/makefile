@@ -15,6 +15,7 @@ ORDERED_OBJS += \
 "./gpio.obj" \
 "./main.obj" \
 "./nvic.obj" \
+"./rgb_led.obj" \
 "./timer.obj" \
 "./tm4c123gh6pm_startup_ccs.obj" \
 "./uart0.obj" \
@@ -150,8 +151,8 @@ Emb2_Project.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "adc0.obj" "clock.obj" "dma.obj" "eeprom.obj" "gpio.obj" "main.obj" "nvic.obj" "timer.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "userInterface.obj" "wait.obj" 
-	-$(RM) "adc0.d" "clock.d" "dma.d" "eeprom.d" "gpio.d" "main.d" "nvic.d" "timer.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "userInterface.d" "wait.d" 
+	-$(RM) "adc0.obj" "clock.obj" "dma.obj" "eeprom.obj" "gpio.obj" "main.obj" "nvic.obj" "rgb_led.obj" "timer.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "userInterface.obj" "wait.obj" 
+	-$(RM) "adc0.d" "clock.d" "dma.d" "eeprom.d" "gpio.d" "main.d" "nvic.d" "rgb_led.d" "timer.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "userInterface.d" "wait.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

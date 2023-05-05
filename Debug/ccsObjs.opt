@@ -5,6 +5,7 @@
 "./gpio.obj"
 "./main.obj"
 "./nvic.obj"
+"./rgb_led.obj"
 "./timer.obj"
 "./tm4c123gh6pm_startup_ccs.obj"
 "./uart0.obj"

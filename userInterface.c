@@ -16,11 +16,12 @@
 #include "uart0.h"
 #include "eeprom.h"
 #include "wait.h"
+#include <math.h>
 
 uint8_t count = 0;
 char strInput[MAX_CHARS+1];
 char* token;
-bool alwaysEventAoa = false;
+bool alwaysEventAoa = true;
 
 void processShell()
 {
@@ -178,12 +179,29 @@ uint16_t asciiToUint16(const char str[])
 
 void displayAvgs(void)
 {
-    char str[30];
+    char str[60];
+    float voltage = 0;
+    float spl = 0;
 
-    putsUart0("mic 1 Avg: ");
-    snprintf(str,sizeof(str),"%"PRIu32"\n",mic1SamplesAvg);
+    voltage = (3.3 * (mic1SamplesAvg + 0.5))/4096;
+    spl = 20*log10(voltage) + 44 + 94;
+    putsUart0("mic 1: \n");
+    snprintf(str,sizeof(str),"raw : %lu, dac: %f, spl : %f\n",mic1SamplesAvg,voltage,spl);
     putsUart0(str);
 
+    voltage = (3.3 * (mic2SamplesAvg + 0.5))/4096;
+    spl = 20*log10(voltage) + 44 + 94;
+    putsUart0("\nmic 2: \n");
+    snprintf(str,sizeof(str),"raw : %lu,dac: %f, spl : %f\n",mic2SamplesAvg,voltage,spl);
+    putsUart0(str);
+
+    voltage = (3.3 * (mic3SamplesAvg + 0.5))/4096;
+    spl = 20*log10(voltage) + 44 + 94;
+    putsUart0("\nmic 3: \n");
+    snprintf(str,sizeof(str),"raw : %lu,dac: %f, spl : %f\n",mic3SamplesAvg,voltage,spl);
+    putsUart0(str);
+
+    /*
     putsUart0("mic 2 Avg: ");
     snprintf(str,sizeof(str),"%"PRIu32"\n",mic2SamplesAvg);
     putsUart0(str);
@@ -191,6 +209,7 @@ void displayAvgs(void)
     putsUart0("mic 3 Avg: ");
     snprintf(str,sizeof(str),"%"PRIu32"\n",mic3SamplesAvg);
     putsUart0(str);
+    */
 }
 
 void setTimeConstant(uint16_t value)

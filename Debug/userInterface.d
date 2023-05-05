@@ -28,6 +28,9 @@ userInterface.obj: ../timer.h
 userInterface.obj: ../uart0.h
 userInterface.obj: ../eeprom.h
 userInterface.obj: ../wait.h
+userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/math.h
+userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_defs.h
+userInterface.obj: /home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_limits.h
 
 ../userInterface.c:
 
@@ -84,4 +87,10 @@ userInterface.obj: ../wait.h
 ../eeprom.h:
 
 ../wait.h:
+
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/math.h:
+
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_defs.h:
+
+/home/sadhan/ti/ccs1210/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_limits.h:
 
